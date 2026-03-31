@@ -1,0 +1,22 @@
+meta {
+  name: Log Weight
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/users/me/weight
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "weightKg": 76.2,
+    "notes": "Morning weigh-in"
+  }
+}
