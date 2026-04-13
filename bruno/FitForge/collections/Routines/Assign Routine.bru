@@ -1,0 +1,21 @@
+meta {
+  name: Assign Routine
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/users/me/assign-routine
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "routineId": 1
+  }
+}

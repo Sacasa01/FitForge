@@ -1,0 +1,19 @@
+meta {
+  name: List Routines
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/routines
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+params:query {
+  ~goal_type: muscle_gain
+}
