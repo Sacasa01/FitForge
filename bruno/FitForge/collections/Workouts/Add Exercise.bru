@@ -1,0 +1,26 @@
+meta {
+  name: Add Exercise
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/workouts/{{workoutId}}/exercises
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "exerciseId": 1,
+    "orderIndex": 0
+  }
+}
+
+vars:post-response {
+  sessionExerciseId: res.body.id
+}

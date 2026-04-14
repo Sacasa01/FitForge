@@ -1,0 +1,23 @@
+meta {
+  name: Finish Workout
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/api/workouts/{{workoutId}}/finish
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "durationMin": 45,
+    "generalFeeling": "good",
+    "notes": "Solid session"
+  }
+}

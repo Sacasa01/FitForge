@@ -1,0 +1,22 @@
+meta {
+  name: Rate Exercise
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/api/workouts/{{workoutId}}/exercises/{{sessionExerciseId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "enjoyment": 4,
+    "difficulty": 3
+  }
+}

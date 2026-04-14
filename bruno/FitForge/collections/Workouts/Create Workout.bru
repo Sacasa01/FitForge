@@ -1,0 +1,26 @@
+meta {
+  name: Create Workout
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/workouts
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "routineId": 1,
+    "notes": "Evening session"
+  }
+}
+
+vars:post-response {
+  workoutId: res.body.id
+}

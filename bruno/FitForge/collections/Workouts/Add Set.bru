@@ -1,0 +1,24 @@
+meta {
+  name: Add Set
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/workouts/{{workoutId}}/exercises/{{sessionExerciseId}}/sets
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "setNumber": 1,
+    "reps": 10,
+    "weightKg": 60.5,
+    "rpe": 7
+  }
+}
