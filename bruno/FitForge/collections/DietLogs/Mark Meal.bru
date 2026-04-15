@@ -1,0 +1,25 @@
+meta {
+  name: Mark Meal
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/diet-logs/{{dietLogId}}/meals
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "mealId": 1
+  }
+}
+
+vars:post-response {
+  mealLogId: res.body.id
+}

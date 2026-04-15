@@ -1,0 +1,27 @@
+meta {
+  name: Create Diet Log
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/diet-logs
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "dietId": 1,
+    "generalFeeling": "good",
+    "notes": "On plan today"
+  }
+}
+
+vars:post-response {
+  dietLogId: res.body.id
+}

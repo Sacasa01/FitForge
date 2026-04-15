@@ -1,0 +1,22 @@
+meta {
+  name: Rate Meal
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/api/diet-logs/{{dietLogId}}/meals/{{mealLogId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "enjoyment": 4,
+    "satiety": 5
+  }
+}
