@@ -1,0 +1,21 @@
+meta {
+  name: Assign Diet
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/users/me/assign-diet
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "dietId": 1
+  }
+}

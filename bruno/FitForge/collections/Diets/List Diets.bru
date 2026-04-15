@@ -1,0 +1,19 @@
+meta {
+  name: List Diets
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/diets
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+params:query {
+  ~goal_type: weight_loss
+}
