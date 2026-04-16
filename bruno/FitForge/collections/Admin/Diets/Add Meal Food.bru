@@ -1,0 +1,26 @@
+meta {
+  name: Add Meal Food
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/admin/meals/{{adminMealId}}/foods
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "foodId": {{foodId}},
+    "quantityG": "150.00"
+  }
+}
+
+vars:post-response {
+  adminMealFoodId: res.body.id
+}

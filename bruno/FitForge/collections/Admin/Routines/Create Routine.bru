@@ -1,0 +1,28 @@
+meta {
+  name: Create Routine
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/admin/routines
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "name": "Hypertrophy A",
+    "description": "Upper body focus",
+    "difficulty": "intermediate",
+    "goalType": "muscle_gain"
+  }
+}
+
+vars:post-response {
+  adminRoutineId: res.body.id
+}

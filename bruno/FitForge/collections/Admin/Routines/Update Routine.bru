@@ -1,0 +1,22 @@
+meta {
+  name: Update Routine
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/api/admin/routines/{{adminRoutineId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "difficulty": "advanced",
+    "description": "Upper body focus, heavy lifts"
+  }
+}

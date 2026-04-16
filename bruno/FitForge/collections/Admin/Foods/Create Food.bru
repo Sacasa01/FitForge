@@ -1,0 +1,31 @@
+meta {
+  name: Create Food
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/admin/foods
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "name": "Chicken Breast",
+    "brand": "Generic",
+    "kcalPer100g": "165.00",
+    "proteinG": "31.00",
+    "carbsG": "0.00",
+    "fatG": "3.60",
+    "fiberG": "0.00"
+  }
+}
+
+vars:post-response {
+  foodId: res.body.id
+}

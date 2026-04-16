@@ -1,0 +1,22 @@
+meta {
+  name: Update Food
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/api/admin/foods/{{foodId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "brand": "Farm Fresh",
+    "kcalPer100g": "170.00"
+  }
+}

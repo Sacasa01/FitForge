@@ -1,0 +1,22 @@
+meta {
+  name: Update Exercise
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/api/admin/exercises/{{exerciseId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "muscleGroup": "quads",
+    "caloriesPerMin": "9.00"
+  }
+}

@@ -1,0 +1,22 @@
+meta {
+  name: Update Diet
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/api/admin/diets/{{adminDietId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "dailyKcal": 1900,
+    "description": "Tighter deficit"
+  }
+}

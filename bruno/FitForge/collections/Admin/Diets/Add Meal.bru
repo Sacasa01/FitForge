@@ -1,0 +1,27 @@
+meta {
+  name: Add Meal
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/admin/diets/{{adminDietId}}/meals
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "name": "Breakfast",
+    "mealTime": "08:00",
+    "dayOfWeek": 1
+  }
+}
+
+vars:post-response {
+  adminMealId: res.body.id
+}

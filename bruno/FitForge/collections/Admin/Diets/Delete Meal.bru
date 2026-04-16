@@ -1,0 +1,15 @@
+meta {
+  name: Delete Meal
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/api/admin/meals/{{adminMealId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

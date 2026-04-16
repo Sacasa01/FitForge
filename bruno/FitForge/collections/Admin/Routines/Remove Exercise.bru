@@ -1,0 +1,15 @@
+meta {
+  name: Remove Exercise
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/api/admin/routines/{{adminRoutineId}}/exercises/{{routineExerciseId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

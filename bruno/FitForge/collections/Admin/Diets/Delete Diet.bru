@@ -1,0 +1,15 @@
+meta {
+  name: Delete Diet
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{baseUrl}}/api/admin/diets/{{adminDietId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

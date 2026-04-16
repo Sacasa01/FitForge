@@ -1,0 +1,29 @@
+meta {
+  name: Create Exercise
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/admin/exercises
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "name": "Barbell Squat",
+    "description": "Compound lower body lift",
+    "muscleGroup": "legs",
+    "equipment": "barbell",
+    "caloriesPerMin": "8.00"
+  }
+}
+
+vars:post-response {
+  exerciseId: res.body.id
+}
