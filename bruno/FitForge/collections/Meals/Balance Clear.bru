@@ -1,0 +1,27 @@
+meta {
+  name: Balance Clear
+  type: http
+  seq: 10
+}
+
+delete {
+  url: {{baseUrl}}/api/meals/1/balance
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+tests {
+  test("returns 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("returns cleared count >= 0", function () {
+    const body = res.getBody();
+    expect(body).to.have.property("cleared");
+    expect(body.cleared).to.be.a("number").and.at.least(0);
+  });
+}

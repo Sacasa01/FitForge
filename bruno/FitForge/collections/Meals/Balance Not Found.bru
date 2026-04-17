@@ -1,0 +1,21 @@
+meta {
+  name: Balance Not Found
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/api/meals/999999/balance
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+tests {
+  test("returns 404 for an unknown meal", function () {
+    expect(res.getStatus()).to.equal(404);
+  });
+}

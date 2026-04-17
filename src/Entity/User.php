@@ -51,6 +51,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 10, enumType: Role::class)]
     private Role $role = Role::User;
 
+    #[ORM\Column(type: Types::DECIMAL, precision: 6, scale: 2, nullable: true)]
+    private ?string $dailyProteinG = null;
+
+    #[ORM\Column(type: Types::DECIMAL, precision: 6, scale: 2, nullable: true)]
+    private ?string $dailyCarbsG = null;
+
+    #[ORM\Column(type: Types::DECIMAL, precision: 6, scale: 2, nullable: true)]
+    private ?string $dailyFatG = null;
+
     #[ORM\ManyToOne(targetEntity: Routine::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?Routine $assignedRoutine = null;
@@ -222,6 +231,39 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
+    }
+
+    public function getDailyProteinG(): ?string
+    {
+        return $this->dailyProteinG;
+    }
+
+    public function setDailyProteinG(?string $dailyProteinG): static
+    {
+        $this->dailyProteinG = $dailyProteinG;
+        return $this;
+    }
+
+    public function getDailyCarbsG(): ?string
+    {
+        return $this->dailyCarbsG;
+    }
+
+    public function setDailyCarbsG(?string $dailyCarbsG): static
+    {
+        $this->dailyCarbsG = $dailyCarbsG;
+        return $this;
+    }
+
+    public function getDailyFatG(): ?string
+    {
+        return $this->dailyFatG;
+    }
+
+    public function setDailyFatG(?string $dailyFatG): static
+    {
+        $this->dailyFatG = $dailyFatG;
+        return $this;
     }
 
     /** @return Collection<int, UserWeightLog> */

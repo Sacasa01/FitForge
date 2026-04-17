@@ -1,0 +1,36 @@
+meta {
+  name: Set Macros
+  type: http
+  seq: 10
+}
+
+put {
+  url: {{baseUrl}}/api/users/me/macros
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "dailyProteinG": 180,
+    "dailyCarbsG": 220,
+    "dailyFatG": 70
+  }
+}
+
+tests {
+  test("returns 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("echoes back the saved macros", function () {
+    const body = res.getBody();
+    expect(parseFloat(body.dailyProteinG)).to.equal(180);
+    expect(parseFloat(body.dailyCarbsG)).to.equal(220);
+    expect(parseFloat(body.dailyFatG)).to.equal(70);
+  });
+}

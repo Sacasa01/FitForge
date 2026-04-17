@@ -1,0 +1,62 @@
+meta {
+  name: Balance
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/meals/1/balance
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+tests {
+  test("returns 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("exposes meal, share, target/current/balanced macros and foods", function () {
+    const body = res.getBody();
+    expect(body).to.include.keys([
+      "mealId",
+      "mealName",
+      "shareOfDay",
+      "targetMacros",
+      "currentMacros",
+      "balancedMacros",
+      "foods",
+      "iterations",
+    ]);
+    expect(body.targetMacros).to.include.keys(["protein", "carbs", "fat", "kcal"]);
+    expect(body.currentMacros).to.include.keys(["protein", "carbs", "fat", "kcal"]);
+    expect(body.balancedMacros).to.include.keys(["protein", "carbs", "fat", "kcal"]);
+  });
+
+  test("share of day is between 0 and 1", function () {
+    const share = res.getBody().shareOfDay;
+    expect(share).to.be.above(0).and.at.most(1);
+  });
+
+  test("each food has scaler within bounds and balanced quantity", function () {
+    const foods = res.getBody().foods;
+    expect(foods).to.be.an("array").that.is.not.empty;
+    foods.forEach((f) => {
+      expect(f).to.include.keys(["mealFoodId", "foodId", "name", "originalQuantityG", "balancedQuantityG", "scaler"]);
+      expect(f.scaler).to.be.at.least(0.25).and.at.most(4.0);
+      expect(f.balancedQuantityG).to.be.at.least(0);
+    });
+  });
+
+  test("balanced macros are closer to target than current macros", function () {
+    const body = res.getBody();
+    const dist = (m) =>
+      Math.abs(m.protein - body.targetMacros.protein) +
+      Math.abs(m.carbs - body.targetMacros.carbs) +
+      Math.abs(m.fat - body.targetMacros.fat);
+    expect(dist(body.balancedMacros)).to.be.at.most(dist(body.currentMacros));
+  });
+}

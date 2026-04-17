@@ -1,0 +1,33 @@
+meta {
+  name: Balance Verify Override
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/api/meals/1/balance
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+tests {
+  test("returns 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("originalQuantityG reflects per-user overrides applied in previous step", function () {
+    const expected = JSON.parse(bru.getVar("appliedQuantitiesByMealFoodId") || "{}");
+    if (Object.keys(expected).length === 0) {
+      throw new Error("Run 'Balance Apply' first to populate the override snapshot");
+    }
+    const foods = res.getBody().foods;
+    expect(foods).to.be.an("array").that.is.not.empty;
+    foods.forEach((f) => {
+      expect(f.originalQuantityG).to.be.closeTo(expected[f.mealFoodId], 0.01);
+    });
+  });
+}

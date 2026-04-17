@@ -65,6 +65,42 @@ class UserController extends AbstractController
         return $this->json($this->serializeUser($user));
     }
 
+    #[Route('/me/macros', methods: ['PUT'])]
+    public function setMacros(Request $request, EntityManagerInterface $em): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+        $data = json_decode($request->getContent(), true);
+
+        if (!$data) {
+            return $this->json(['error' => 'Invalid JSON'], Response::HTTP_BAD_REQUEST);
+        }
+
+        foreach (['dailyProteinG', 'dailyCarbsG', 'dailyFatG'] as $field) {
+            if (!array_key_exists($field, $data)) {
+                continue;
+            }
+            $value = $data[$field];
+            if ($value === null) {
+                $user->{'set' . ucfirst($field)}(null);
+                continue;
+            }
+            $float = (float) $value;
+            if ($float < 0 || $float > 9999) {
+                return $this->json(['error' => sprintf('%s must be between 0 and 9999', $field)], Response::HTTP_BAD_REQUEST);
+            }
+            $user->{'set' . ucfirst($field)}((string) $float);
+        }
+
+        $em->flush();
+
+        return $this->json([
+            'dailyProteinG' => $user->getDailyProteinG(),
+            'dailyCarbsG' => $user->getDailyCarbsG(),
+            'dailyFatG' => $user->getDailyFatG(),
+        ]);
+    }
+
     #[Route('/me/weight', methods: ['POST'])]
     public function logWeight(Request $request, EntityManagerInterface $em): JsonResponse
     {
@@ -156,6 +192,9 @@ class UserController extends AbstractController
             'role' => $user->getRole()->value,
             'assignedRoutineId' => $user->getAssignedRoutine()?->getId(),
             'assignedDietId' => $user->getAssignedDiet()?->getId(),
+            'dailyProteinG' => $user->getDailyProteinG(),
+            'dailyCarbsG' => $user->getDailyCarbsG(),
+            'dailyFatG' => $user->getDailyFatG(),
             'createdAt' => $user->getCreatedAt()->format('c'),
         ];
     }

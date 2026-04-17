@@ -3,8 +3,12 @@
 namespace App\Controller;
 
 use App\Entity\Meal;
+use App\Entity\MealFood;
 use App\Entity\MealLog;
 use App\Entity\User;
+use App\Entity\UserMealFoodOverride;
+use App\Repository\UserMealFoodOverrideRepository;
+use App\Service\MealBalancer;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -145,5 +149,213 @@ class MealController extends AbstractController
         usort($scored, fn($a, $b) => $b['recommendationScore'] <=> $a['recommendationScore']);
 
         return $this->json(['data' => array_slice($scored, 0, $limit)]);
+    }
+
+    #[Route('/api/meals/{id}/balance', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function balance(
+        int $id,
+        EntityManagerInterface $em,
+        MealBalancer $balancer,
+        UserMealFoodOverrideRepository $overrideRepo,
+    ): JsonResponse {
+        $result = $this->buildBalancePlan($id, $em, $balancer, $overrideRepo);
+        if ($result instanceof JsonResponse) {
+            return $result;
+        }
+
+        return $this->json($result['payload']);
+    }
+
+    #[Route('/api/meals/{id}/balance/apply', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function applyBalance(
+        int $id,
+        EntityManagerInterface $em,
+        MealBalancer $balancer,
+        UserMealFoodOverrideRepository $overrideRepo,
+    ): JsonResponse {
+        $result = $this->buildBalancePlan($id, $em, $balancer, $overrideRepo);
+        if ($result instanceof JsonResponse) {
+            return $result;
+        }
+
+        /** @var User $user */
+        $user = $this->getUser();
+
+        $mealFoodById = [];
+        foreach ($result['meal']->getMealFoods() as $mf) {
+            $mealFoodById[$mf->getId()] = $mf;
+        }
+
+        $existingByMealFoodId = [];
+        $existing = $overrideRepo->findBy([
+            'user' => $user,
+            'mealFood' => array_keys($mealFoodById),
+        ]);
+        foreach ($existing as $o) {
+            $existingByMealFoodId[$o->getMealFood()->getId()] = $o;
+        }
+
+        foreach ($result['payload']['foods'] as $foodPlan) {
+            $mealFood = $mealFoodById[$foodPlan['mealFoodId']] ?? null;
+            if ($mealFood === null) {
+                continue;
+            }
+
+            $override = $existingByMealFoodId[$mealFood->getId()] ?? null;
+            if ($override === null) {
+                $override = (new UserMealFoodOverride())
+                    ->setUser($user)
+                    ->setMealFood($mealFood);
+                $em->persist($override);
+            }
+            $override->setQuantityG((string) $foodPlan['balancedQuantityG']);
+        }
+
+        $em->flush();
+
+        return $this->json($result['payload'] + ['applied' => true]);
+    }
+
+    /**
+     * @return JsonResponse|array{meal: Meal, payload: array<string, mixed>}
+     */
+    private function buildBalancePlan(
+        int $id,
+        EntityManagerInterface $em,
+        MealBalancer $balancer,
+        UserMealFoodOverrideRepository $overrideRepo,
+    ): JsonResponse|array {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        if (
+            $user->getDailyProteinG() === null
+            || $user->getDailyCarbsG() === null
+            || $user->getDailyFatG() === null
+        ) {
+            return $this->json([
+                'error' => 'User daily macro targets are not set. PUT /api/users/me/macros first.',
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $meal = $em->getRepository(Meal::class)->find($id);
+        if (!$meal) {
+            return $this->json(['error' => 'Meal not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $diet = $meal->getDiet();
+        $dietMeals = $diet->getMeals();
+
+        $allMealFoodIds = [];
+        foreach ($dietMeals as $m) {
+            foreach ($m->getMealFoods() as $mf) {
+                $allMealFoodIds[] = $mf->getId();
+            }
+        }
+
+        $overrides = $overrideRepo->loadOverridesMap($user, $allMealFoodIds);
+
+        $applyOverrides = static function (array $ingredients) use ($overrides): array {
+            foreach ($ingredients as &$ing) {
+                if (isset($overrides[$ing['mealFoodId']])) {
+                    $ing['quantityG'] = $overrides[$ing['mealFoodId']];
+                }
+            }
+            return $ingredients;
+        };
+
+        $ingredients = $applyOverrides($balancer->extractIngredients($meal));
+        if (empty($ingredients)) {
+            return $this->json(['error' => 'Meal has no foods to balance'], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $current = $balancer->summarize($ingredients);
+
+        $dietTotalKcal = 0.0;
+        foreach ($dietMeals as $m) {
+            $dietTotalKcal += $balancer->summarize($applyOverrides($balancer->extractIngredients($m)))['kcal'];
+        }
+
+        if ($dietTotalKcal <= 0) {
+            return $this->json([
+                'error' => 'Diet has no caloric content; cannot compute meal share',
+            ], Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+        $share = $current['kcal'] / $dietTotalKcal;
+
+        $target = [
+            'protein' => (float) $user->getDailyProteinG() * $share,
+            'carbs' => (float) $user->getDailyCarbsG() * $share,
+            'fat' => (float) $user->getDailyFatG() * $share,
+        ];
+        $targetKcal = $target['protein'] * 4 + $target['carbs'] * 4 + $target['fat'] * 9;
+
+        $balanced = $balancer->balance($ingredients, $target);
+
+        $foodsPayload = [];
+        foreach ($ingredients as $i => $ing) {
+            $foodsPayload[] = [
+                'mealFoodId' => $ing['mealFoodId'],
+                'foodId' => $ing['foodId'],
+                'name' => $ing['name'],
+                'originalQuantityG' => round($ing['quantityG'], 2),
+                'balancedQuantityG' => $balanced['balancedQuantities'][$i],
+                'scaler' => $balanced['scalers'][$i],
+            ];
+        }
+
+        $payload = [
+            'mealId' => $meal->getId(),
+            'mealName' => $meal->getName(),
+            'shareOfDay' => round($share, 4),
+            'targetMacros' => [
+                'protein' => round($target['protein'], 2),
+                'carbs' => round($target['carbs'], 2),
+                'fat' => round($target['fat'], 2),
+                'kcal' => round($targetKcal, 2),
+            ],
+            'currentMacros' => $current,
+            'balancedMacros' => $balanced['balancedMacros'],
+            'foods' => $foodsPayload,
+            'iterations' => $balanced['iterations'],
+        ];
+
+        return ['meal' => $meal, 'payload' => $payload];
+    }
+
+    #[Route('/api/meals/{id}/balance', methods: ['DELETE'], requirements: ['id' => '\d+'])]
+    public function clearBalance(
+        int $id,
+        EntityManagerInterface $em,
+        UserMealFoodOverrideRepository $overrideRepo,
+    ): JsonResponse {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        $meal = $em->getRepository(Meal::class)->find($id);
+        if (!$meal) {
+            return $this->json(['error' => 'Meal not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $mealFoodIds = [];
+        foreach ($meal->getMealFoods() as $mf) {
+            $mealFoodIds[] = $mf->getId();
+        }
+
+        if (empty($mealFoodIds)) {
+            return $this->json(['cleared' => 0]);
+        }
+
+        $cleared = $em->createQueryBuilder()
+            ->delete(UserMealFoodOverride::class, 'o')
+            ->where('o.user = :user')
+            ->andWhere('o.mealFood IN (:ids)')
+            ->setParameter('user', $user)
+            ->setParameter('ids', $mealFoodIds)
+            ->getQuery()
+            ->execute();
+
+        return $this->json(['cleared' => (int) $cleared]);
     }
 }
