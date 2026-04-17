@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\ActivityLevel;
 use App\Enum\GoalType;
 use App\Enum\Role;
 use App\Repository\UserRepository;
@@ -48,6 +49,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 20, enumType: GoalType::class)]
     private ?GoalType $goalType = null;
 
+    #[ORM\Column(length: 20, enumType: ActivityLevel::class, nullable: true)]
+    private ?ActivityLevel $activityLevel = null;
+
     #[ORM\Column(length: 10, enumType: Role::class)]
     private Role $role = Role::User;
 
@@ -59,6 +63,24 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(type: Types::DECIMAL, precision: 6, scale: 2, nullable: true)]
     private ?string $dailyFatG = null;
+
+    #[ORM\Column(type: Types::DECIMAL, precision: 7, scale: 2, nullable: true)]
+    private ?string $dailyKcal = null;
+
+    #[ORM\Column(type: Types::DECIMAL, precision: 4, scale: 1, nullable: true)]
+    private ?string $bodyFatPercent = null;
+
+    #[ORM\Column(type: Types::DECIMAL, precision: 5, scale: 2, nullable: true)]
+    private ?string $bmi = null;
+
+    #[ORM\Column(type: Types::DECIMAL, precision: 7, scale: 2, nullable: true)]
+    private ?string $bmr = null;
+
+    #[ORM\Column(type: Types::DECIMAL, precision: 7, scale: 2, nullable: true)]
+    private ?string $tdee = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $nutritionCalculatedAt = null;
 
     #[ORM\ManyToOne(targetEntity: Routine::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
@@ -195,6 +217,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    public function getActivityLevel(): ?ActivityLevel
+    {
+        return $this->activityLevel;
+    }
+
+    public function setActivityLevel(?ActivityLevel $activityLevel): static
+    {
+        $this->activityLevel = $activityLevel;
+        return $this;
+    }
+
     public function getRole(): Role
     {
         return $this->role;
@@ -263,6 +296,72 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setDailyFatG(?string $dailyFatG): static
     {
         $this->dailyFatG = $dailyFatG;
+        return $this;
+    }
+
+    public function getDailyKcal(): ?string
+    {
+        return $this->dailyKcal;
+    }
+
+    public function setDailyKcal(?string $dailyKcal): static
+    {
+        $this->dailyKcal = $dailyKcal;
+        return $this;
+    }
+
+    public function getBodyFatPercent(): ?string
+    {
+        return $this->bodyFatPercent;
+    }
+
+    public function setBodyFatPercent(?string $bodyFatPercent): static
+    {
+        $this->bodyFatPercent = $bodyFatPercent;
+        return $this;
+    }
+
+    public function getBmi(): ?string
+    {
+        return $this->bmi;
+    }
+
+    public function setBmi(?string $bmi): static
+    {
+        $this->bmi = $bmi;
+        return $this;
+    }
+
+    public function getBmr(): ?string
+    {
+        return $this->bmr;
+    }
+
+    public function setBmr(?string $bmr): static
+    {
+        $this->bmr = $bmr;
+        return $this;
+    }
+
+    public function getTdee(): ?string
+    {
+        return $this->tdee;
+    }
+
+    public function setTdee(?string $tdee): static
+    {
+        $this->tdee = $tdee;
+        return $this;
+    }
+
+    public function getNutritionCalculatedAt(): ?\DateTimeImmutable
+    {
+        return $this->nutritionCalculatedAt;
+    }
+
+    public function setNutritionCalculatedAt(?\DateTimeImmutable $nutritionCalculatedAt): static
+    {
+        $this->nutritionCalculatedAt = $nutritionCalculatedAt;
         return $this;
     }
 
