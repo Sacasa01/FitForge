@@ -1,0 +1,39 @@
+meta {
+  name: Recommend Dinner Custom Limit
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/meals/recommend?mealTime=dinner&limit=1
+  body: none
+  auth: bearer
+}
+
+params:query {
+  mealTime: dinner
+  limit: 1
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+tests {
+  test("returns 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("returns at most 1 item", function () {
+    expect(res.getBody().data.length).to.be.at.most(1);
+  });
+
+  test("result is in the dinner window (16:00-23:59)", function () {
+    res.getBody().data.forEach((item) => {
+      const [h, m] = item.mealTime.split(":").map(Number);
+      const minutes = h * 60 + m;
+      expect(minutes).to.be.at.least(16 * 60);
+      expect(minutes).to.be.at.most(23 * 60 + 59);
+    });
+  });
+}

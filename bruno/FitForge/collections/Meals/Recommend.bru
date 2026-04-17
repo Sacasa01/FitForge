@@ -1,0 +1,68 @@
+meta {
+  name: Recommend
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/meals/recommend?mealTime=breakfast&limit=5
+  body: none
+  auth: bearer
+}
+
+params:query {
+  mealTime: breakfast
+  limit: 5
+  ~dietId: 1
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+tests {
+  test("returns 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("wraps results in data array", function () {
+    expect(res.getBody()).to.have.property("data").that.is.an("array");
+  });
+
+  test("respects limit", function () {
+    expect(res.getBody().data.length).to.be.at.most(5);
+  });
+
+  test("each item exposes the recommendation fields", function () {
+    res.getBody().data.forEach((item) => {
+      expect(item).to.include.keys([
+        "id",
+        "name",
+        "mealTime",
+        "diet",
+        "recommendationScore",
+        "personalEnjoyment",
+        "personalSatiety",
+        "globalEnjoyment",
+        "globalSatiety",
+      ]);
+      expect(item.diet).to.include.keys(["id", "name"]);
+      expect(item.recommendationScore).to.be.a("number");
+    });
+  });
+
+  test("results fall in the breakfast time window (05:00-10:59)", function () {
+    res.getBody().data.forEach((item) => {
+      const [h, m] = item.mealTime.split(":").map(Number);
+      const minutes = h * 60 + m;
+      expect(minutes).to.be.at.least(5 * 60);
+      expect(minutes).to.be.at.most(10 * 60 + 59);
+    });
+  });
+
+  test("results are sorted by recommendationScore desc", function () {
+    const scores = res.getBody().data.map((i) => i.recommendationScore);
+    const sorted = [...scores].sort((a, b) => b - a);
+    expect(scores).to.deep.equal(sorted);
+  });
+}

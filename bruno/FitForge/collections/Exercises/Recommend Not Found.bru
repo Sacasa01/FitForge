@@ -1,0 +1,26 @@
+meta {
+  name: Recommend Not Found
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/exercises/recommend?muscleGroup=tail
+  body: none
+  auth: bearer
+}
+
+params:query {
+  muscleGroup: tail
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+tests {
+  test("returns 404 for an unknown muscle group", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody().error).to.be.a("string");
+  });
+}

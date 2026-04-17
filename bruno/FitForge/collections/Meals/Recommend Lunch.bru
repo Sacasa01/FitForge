@@ -1,0 +1,36 @@
+meta {
+  name: Recommend Lunch
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/meals/recommend?mealTime=lunch
+  body: none
+  auth: bearer
+}
+
+params:query {
+  mealTime: lunch
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+tests {
+  test("returns 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("results fall in the lunch window (11:00-15:59)", function () {
+    const data = res.getBody().data;
+    expect(data).to.be.an("array").that.is.not.empty;
+    data.forEach((item) => {
+      const [h, m] = item.mealTime.split(":").map(Number);
+      const minutes = h * 60 + m;
+      expect(minutes).to.be.at.least(11 * 60);
+      expect(minutes).to.be.at.most(15 * 60 + 59);
+    });
+  });
+}

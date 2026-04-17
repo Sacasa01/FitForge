@@ -1,0 +1,26 @@
+meta {
+  name: Recommend Invalid Slot
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/meals/recommend?mealTime=brunch
+  body: none
+  auth: bearer
+}
+
+params:query {
+  mealTime: brunch
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+tests {
+  test("returns 400 for an invalid slot", function () {
+    expect(res.getStatus()).to.equal(400);
+    expect(res.getBody().error).to.match(/breakfast.*lunch.*dinner/);
+  });
+}

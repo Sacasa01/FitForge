@@ -1,0 +1,21 @@
+meta {
+  name: Recommend Unauthorized
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/api/meals/recommend?mealTime=lunch
+  body: none
+  auth: none
+}
+
+params:query {
+  mealTime: lunch
+}
+
+tests {
+  test("rejects unauthenticated requests", function () {
+    expect(res.getStatus()).to.equal(401);
+  });
+}
