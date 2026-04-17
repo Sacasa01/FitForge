@@ -1,0 +1,30 @@
+meta {
+  name: Recommend Custom Limit
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/exercises/recommend?muscleGroup=chest&limit=2
+  body: none
+  auth: bearer
+}
+
+params:query {
+  muscleGroup: chest
+  limit: 2
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+tests {
+  test("returns 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("returns at most 2 items", function () {
+    expect(res.getBody().data.length).to.be.at.most(2);
+  });
+}

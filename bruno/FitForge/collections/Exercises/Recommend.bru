@@ -1,0 +1,58 @@
+meta {
+  name: Recommend
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/exercises/recommend?muscleGroup=chest&limit=5
+  body: none
+  auth: bearer
+}
+
+params:query {
+  muscleGroup: chest
+  limit: 5
+  ~equipment: barbell
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+tests {
+  test("returns 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("wraps results in data array", function () {
+    expect(res.getBody()).to.have.property("data").that.is.an("array");
+  });
+
+  test("respects limit", function () {
+    expect(res.getBody().data.length).to.be.at.most(5);
+  });
+
+  test("each item exposes the recommendation fields", function () {
+    res.getBody().data.forEach((item) => {
+      expect(item).to.include.keys([
+        "id",
+        "name",
+        "muscleGroup",
+        "equipment",
+        "description",
+        "recommendationScore",
+        "personalScore",
+        "globalScore",
+      ]);
+      expect(item.muscleGroup).to.equal("chest");
+      expect(item.recommendationScore).to.be.a("number");
+    });
+  });
+
+  test("results are sorted by recommendationScore desc", function () {
+    const scores = res.getBody().data.map((i) => i.recommendationScore);
+    const sorted = [...scores].sort((a, b) => b - a);
+    expect(scores).to.deep.equal(sorted);
+  });
+}

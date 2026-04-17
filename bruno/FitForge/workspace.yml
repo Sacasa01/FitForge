@@ -1,0 +1,12 @@
+opencollection: 1.0.0
+info:
+  name: "FitForge"
+  type: workspace
+
+collections:
+  - name: "FitForge API"
+    path: collections
+
+specs:
+
+docs: ''

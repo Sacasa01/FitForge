@@ -1,0 +1,32 @@
+meta {
+  name: Recommend Equipment Filter
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/exercises/recommend?muscleGroup=chest&equipment=barbell
+  body: none
+  auth: bearer
+}
+
+params:query {
+  muscleGroup: chest
+  equipment: barbell
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+tests {
+  test("returns 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("only returns matching equipment", function () {
+    const data = res.getBody().data;
+    expect(data).to.be.an("array").that.is.not.empty;
+    data.forEach((item) => expect(item.equipment).to.equal("barbell"));
+  });
+}
