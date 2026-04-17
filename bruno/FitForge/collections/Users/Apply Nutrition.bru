@@ -1,0 +1,35 @@
+meta {
+  name: Apply Nutrition
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/api/users/me/nutrition/apply
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "bodyFatPercent": 18,
+    "activityLevel": "moderate"
+  }
+}
+
+tests {
+  test("returns 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("response contains recommended macros", function () {
+    const body = res.getBody();
+    expect(body.macros.proteinG).to.be.a("number");
+    expect(body.macros.carbsG).to.be.a("number");
+    expect(body.macros.fatG).to.be.a("number");
+  });
+}

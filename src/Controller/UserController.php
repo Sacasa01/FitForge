@@ -4,7 +4,9 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Entity\UserWeightLog;
+use App\Enum\ActivityLevel;
 use App\Enum\GoalType;
+use App\Service\NutritionCalculator;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -58,6 +60,19 @@ class UserController extends AbstractController
                 ], Response::HTTP_BAD_REQUEST);
             }
             $user->setGoalType($goalType);
+        }
+        if (array_key_exists('activityLevel', $data)) {
+            if ($data['activityLevel'] === null) {
+                $user->setActivityLevel(null);
+            } else {
+                $activityLevel = ActivityLevel::tryFrom($data['activityLevel']);
+                if (!$activityLevel) {
+                    return $this->json([
+                        'error' => 'Invalid activityLevel. Must be one of: sedentary, light, moderate, active, very_active',
+                    ], Response::HTTP_BAD_REQUEST);
+                }
+                $user->setActivityLevel($activityLevel);
+            }
         }
 
         $em->flush();
@@ -177,6 +192,97 @@ class UserController extends AbstractController
         ]);
     }
 
+    #[Route('/me/nutrition', methods: ['GET'])]
+    public function nutrition(Request $request, NutritionCalculator $calculator): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        $bodyFatPercent = null;
+        if ($request->query->has('bodyFatPercent')) {
+            $bodyFatPercent = (float) $request->query->get('bodyFatPercent');
+            if ($bodyFatPercent < 2 || $bodyFatPercent > 60) {
+                return $this->json(['error' => 'bodyFatPercent must be between 2 and 60'], Response::HTTP_BAD_REQUEST);
+            }
+        }
+
+        $activityOverride = null;
+        if ($request->query->has('activityLevel')) {
+            $activityOverride = ActivityLevel::tryFrom((string) $request->query->get('activityLevel'));
+            if (!$activityOverride) {
+                return $this->json([
+                    'error' => 'Invalid activityLevel. Must be one of: sedentary, light, moderate, active, very_active',
+                ], Response::HTTP_BAD_REQUEST);
+            }
+        }
+
+        $sex = $request->query->has('sex') ? (string) $request->query->get('sex') : null;
+        if ($sex !== null && !in_array($sex, ['male', 'female'], true)) {
+            return $this->json(['error' => 'sex must be "male" or "female"'], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $profile = $calculator->profileFor($user, $bodyFatPercent, $activityOverride, $sex);
+        } catch (\DomainException | \InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
+
+        return $this->json($profile);
+    }
+
+    #[Route('/me/nutrition/apply', methods: ['POST'])]
+    public function applyNutrition(
+        Request $request,
+        NutritionCalculator $calculator,
+        EntityManagerInterface $em,
+    ): JsonResponse {
+        /** @var User $user */
+        $user = $this->getUser();
+        $data = json_decode($request->getContent(), true) ?? [];
+
+        $bodyFatPercent = isset($data['bodyFatPercent']) ? (float) $data['bodyFatPercent'] : null;
+        if ($bodyFatPercent !== null && ($bodyFatPercent < 2 || $bodyFatPercent > 60)) {
+            return $this->json(['error' => 'bodyFatPercent must be between 2 and 60'], Response::HTTP_BAD_REQUEST);
+        }
+
+        $activityOverride = null;
+        if (isset($data['activityLevel'])) {
+            $activityOverride = ActivityLevel::tryFrom((string) $data['activityLevel']);
+            if (!$activityOverride) {
+                return $this->json([
+                    'error' => 'Invalid activityLevel. Must be one of: sedentary, light, moderate, active, very_active',
+                ], Response::HTTP_BAD_REQUEST);
+            }
+        }
+
+        $sex = isset($data['sex']) ? (string) $data['sex'] : null;
+        if ($sex !== null && !in_array($sex, ['male', 'female'], true)) {
+            return $this->json(['error' => 'sex must be "male" or "female"'], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $profile = $calculator->profileFor($user, $bodyFatPercent, $activityOverride, $sex);
+        } catch (\DomainException | \InvalidArgumentException $e) {
+            return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
+
+        $user->setDailyProteinG((string) $profile['macros']['proteinG']);
+        $user->setDailyCarbsG((string) $profile['macros']['carbsG']);
+        $user->setDailyFatG((string) $profile['macros']['fatG']);
+        $user->setDailyKcal((string) $profile['macros']['kcalAdjusted']);
+        $user->setBodyFatPercent($bodyFatPercent !== null ? (string) $bodyFatPercent : null);
+        $user->setBmi((string) $profile['bmi']);
+        $user->setBmr((string) $profile['bmr']);
+        $user->setTdee((string) $profile['tdee']);
+        if ($activityOverride !== null) {
+            $user->setActivityLevel($activityOverride);
+        }
+        $user->setNutritionCalculatedAt(new \DateTimeImmutable());
+        $em->flush();
+
+        return $this->json($profile);
+    }
+
     private function serializeUser(User $user): array
     {
         return [
@@ -189,12 +295,19 @@ class UserController extends AbstractController
             'heightCm' => $user->getHeightCm(),
             'currentWeightKg' => $user->getCurrentWeightKg(),
             'goalType' => $user->getGoalType()?->value,
+            'activityLevel' => $user->getActivityLevel()?->value,
             'role' => $user->getRole()->value,
             'assignedRoutineId' => $user->getAssignedRoutine()?->getId(),
             'assignedDietId' => $user->getAssignedDiet()?->getId(),
             'dailyProteinG' => $user->getDailyProteinG(),
             'dailyCarbsG' => $user->getDailyCarbsG(),
             'dailyFatG' => $user->getDailyFatG(),
+            'dailyKcal' => $user->getDailyKcal(),
+            'bodyFatPercent' => $user->getBodyFatPercent(),
+            'bmi' => $user->getBmi(),
+            'bmr' => $user->getBmr(),
+            'tdee' => $user->getTdee(),
+            'nutritionCalculatedAt' => $user->getNutritionCalculatedAt()?->format('c'),
             'createdAt' => $user->getCreatedAt()->format('c'),
         ];
     }

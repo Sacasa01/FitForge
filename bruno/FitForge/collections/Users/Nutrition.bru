@@ -1,0 +1,47 @@
+meta {
+  name: Nutrition
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/api/users/me/nutrition?bodyFatPercent=18&activityLevel=moderate
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+params:query {
+  bodyFatPercent: 18
+  activityLevel: moderate
+}
+
+tests {
+  test("returns 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("returns BMI, BMR, TDEE and macros", function () {
+    const body = res.getBody();
+    expect(body).to.have.property("bmi");
+    expect(body).to.have.property("bmiCategory");
+    expect(body).to.have.property("bmr");
+    expect(body).to.have.property("tdee");
+    expect(body).to.have.property("macros");
+    expect(body.macros).to.have.all.keys(
+      "kcal", "kcalAdjusted", "deficitOrSurplus",
+      "proteinG", "carbsG", "fatG",
+    );
+  });
+
+  test("uses Katch-McArdle when body fat is provided", function () {
+    expect(res.getBody().bmrFormula).to.equal("katch_mcardle");
+  });
+
+  test("echoes back the activity level override", function () {
+    expect(res.getBody().activityLevel).to.equal("moderate");
+  });
+}
