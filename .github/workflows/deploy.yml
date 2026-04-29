@@ -1,0 +1,168 @@
+name: Build & Deploy
+
+on:
+    push:
+        branches: [main]
+
+env:
+    REGISTRY: ghcr.io
+    IMAGE: ghcr.io/${{ github.repository_owner }}/fitforge
+
+jobs:
+    test:
+        name: Test
+        runs-on: ubuntu-latest
+
+        services:
+            mysql:
+                image: mysql:8.0
+                env:
+                    MYSQL_ROOT_PASSWORD: root
+                    MYSQL_DATABASE: app_test
+                ports: ['3306:3306']
+                options: >-
+                    --health-cmd="mysqladmin ping"
+                    --health-interval=10s
+                    --health-timeout=5s
+                    --health-retries=3
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.4'
+                  extensions: mbstring, intl, pdo_mysql, zip
+                  coverage: none
+
+            - name: Cache Composer
+              uses: actions/cache@v4
+              with:
+                  path: vendor
+                  key: composer-${{ hashFiles('composer.lock') }}
+                  restore-keys: composer-
+
+            - name: Install dependencies
+              run: composer install --prefer-dist --no-interaction
+
+            - name: Run tests
+              env:
+                  DATABASE_URL: mysql://root:root@127.0.0.1:3306/app_test
+                  APP_ENV: test
+              run: php bin/phpunit
+
+    build-push:
+        name: Build & Push Image
+        needs: test
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Login to ghcr.io
+              uses: docker/login-action@v3
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Docker metadata
+              id: meta
+              uses: docker/metadata-action@v5
+              with:
+                  images: ${{ env.IMAGE }}
+                  tags: |
+                      type=sha,prefix=sha-
+                      type=raw,value=latest
+
+            - name: Build and push
+              uses: docker/build-push-action@v5
+              with:
+                  context: .
+                  push: true
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}
+                  cache-from: type=registry,ref=${{ env.IMAGE }}:latest
+                  cache-to: type=inline
+
+    deploy:
+        name: Deploy
+        needs: build-push
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Pull new image via Portainer API
+              run: |
+                  curl -sf -X POST \
+                    "${{ secrets.PORTAINER_URL }}/api/endpoints/${{ secrets.PORTAINER_ENDPOINT_ID }}/docker/images/create?fromImage=${{ env.IMAGE }}&tag=latest" \
+                    -H "X-API-Key: ${{ secrets.PORTAINER_API_KEY }}" \
+                    -H "X-Registry-Auth: ${{ secrets.PORTAINER_REGISTRY_AUTH }}"
+
+            - name: Stop and remove old container
+              run: |
+                  curl -sf -X POST \
+                    "${{ secrets.PORTAINER_URL }}/api/endpoints/${{ secrets.PORTAINER_ENDPOINT_ID }}/docker/containers/${{ secrets.CONTAINER_NAME }}/stop" \
+                    -H "X-API-Key: ${{ secrets.PORTAINER_API_KEY }}" || true
+
+                  curl -sf -X DELETE \
+                    "${{ secrets.PORTAINER_URL }}/api/endpoints/${{ secrets.PORTAINER_ENDPOINT_ID }}/docker/containers/${{ secrets.CONTAINER_NAME }}?force=true" \
+                    -H "X-API-Key: ${{ secrets.PORTAINER_API_KEY }}" || true
+
+            - name: Create new container
+              id: create
+              run: |
+                  CONTAINER_ID=$(curl -sf -X POST \
+                    "${{ secrets.PORTAINER_URL }}/api/endpoints/${{ secrets.PORTAINER_ENDPOINT_ID }}/docker/containers/create?name=${{ secrets.CONTAINER_NAME }}" \
+                    -H "X-API-Key: ${{ secrets.PORTAINER_API_KEY }}" \
+                    -H "Content-Type: application/json" \
+                    -d @docker/container-config.json | jq -r '.Id')
+
+                  echo "container_id=$CONTAINER_ID" >> $GITHUB_OUTPUT
+
+            - name: Start container
+              run: |
+                  curl -sf -X POST \
+                    "${{ secrets.PORTAINER_URL }}/api/endpoints/${{ secrets.PORTAINER_ENDPOINT_ID }}/docker/containers/${{ steps.create.outputs.container_id }}/start" \
+                    -H "X-API-Key: ${{ secrets.PORTAINER_API_KEY }}"
+
+            - name: Wait for container to be ready
+              run: sleep 8
+
+            - name: Run composer install
+              run: |
+                  EXEC_ID=$(curl -sf -X POST \
+                    "${{ secrets.PORTAINER_URL }}/api/endpoints/${{ secrets.PORTAINER_ENDPOINT_ID }}/docker/containers/${{ secrets.CONTAINER_NAME }}/exec" \
+                    -H "X-API-Key: ${{ secrets.PORTAINER_API_KEY }}" \
+                    -H "Content-Type: application/json" \
+                    -d '{
+                      "AttachStdout": true,
+                      "AttachStderr": true,
+                      "Cmd": ["composer", "install", "--no-dev", "--optimize-autoloader", "--no-interaction"]
+                    }' | jq -r '.Id')
+
+                  curl -sf -X POST \
+                    "${{ secrets.PORTAINER_URL }}/api/endpoints/${{ secrets.PORTAINER_ENDPOINT_ID }}/docker/exec/$EXEC_ID/start" \
+                    -H "X-API-Key: ${{ secrets.PORTAINER_API_KEY }}" \
+                    -H "Content-Type: application/json" \
+                    -d '{"Detach": false}'
+
+            - name: Run database migrations
+              run: |
+                  EXEC_ID=$(curl -sf -X POST \
+                    "${{ secrets.PORTAINER_URL }}/api/endpoints/${{ secrets.PORTAINER_ENDPOINT_ID }}/docker/containers/${{ secrets.CONTAINER_NAME }}/exec" \
+                    -H "X-API-Key: ${{ secrets.PORTAINER_API_KEY }}" \
+                    -H "Content-Type: application/json" \
+                    -d '{
+                      "AttachStdout": true,
+                      "AttachStderr": true,
+                      "Cmd": ["php", "bin/console", "doctrine:migrations:migrate", "--no-interaction", "--allow-no-migration"]
+                    }' | jq -r '.Id')
+
+                  curl -sf -X POST \
+                    "${{ secrets.PORTAINER_URL }}/api/endpoints/${{ secrets.PORTAINER_ENDPOINT_ID }}/docker/exec/$EXEC_ID/start" \
+                    -H "X-API-Key: ${{ secrets.PORTAINER_API_KEY }}" \
+                    -H "Content-Type: application/json" \
+                    -d '{"Detach": false}'

@@ -1,0 +1,22 @@
+{
+    "Image": "ghcr.io/Sacasa01/fitforge:latest",
+    "Env": [
+        "APP_ENV=prod"
+    ],
+    "HostConfig": {
+        "RestartPolicy": { "Name": "unless-stopped" },
+        "Binds": [
+            "/opt/fitforge/.env.local:/var/www/app/.env.local:ro",
+            "/opt/fitforge/var/log:/var/www/app/var/log"
+        ],
+        "PortBindings": {
+            "80/tcp": [{ "HostPort": "8081" }]
+        },
+        "NetworkMode": "fitforge-net"
+    },
+    "NetworkingConfig": {
+        "EndpointsConfig": {
+            "fitforge-net": {}
+        }
+    }
+}
