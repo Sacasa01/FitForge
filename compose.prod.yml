@@ -1,0 +1,19 @@
+services:
+  app:
+    image: ghcr.io/sacasa01/fitforge:latest
+    pull_policy: always
+    container_name: fitforge
+    restart: unless-stopped
+    environment:
+      APP_ENV: prod
+    volumes:
+      - /opt/fitforge/.env.local:/var/www/app/.env.local:ro
+      - /opt/fitforge/var/log:/var/www/app/var/log
+    ports:
+      - "8081:80"
+    networks:
+      - fitforge-net
+
+networks:
+  fitforge-net:
+    external: true
