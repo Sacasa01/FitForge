@@ -50,8 +50,8 @@ jobs:
             - name: Install dependencies
               run: composer install --prefer-dist --no-interaction
 
-    build-push:
-        name: Build & Push Image
+    deploy:
+        name: Deploy
         needs: test
         runs-on: ubuntu-latest
 
@@ -84,12 +84,6 @@ jobs:
                   cache-from: type=registry,ref=${{ env.IMAGE }}:latest
                   cache-to: type=inline
 
-    deploy:
-        name: Deploy
-        needs: build-push
-        runs-on: ubuntu-latest
-
-        steps:
             - name: Trigger Portainer stack webhook
               run: |
                   curl -sf -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}"
