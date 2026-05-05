@@ -86,4 +86,22 @@ jobs:
 
             - name: Trigger Portainer stack webhook
               run: |
-                  curl -sf -X POST "${{ secrets.PORTAINER_WEBHOOK_URL }}"
+                  response_file="$(mktemp)"
+                  status_code="$(
+                      curl -sS -L \
+                          --retry 3 \
+                          --retry-delay 10 \
+                          --retry-all-errors \
+                          -o "$response_file" \
+                          -w "%{http_code}" \
+                          -X POST \
+                          "${{ secrets.PORTAINER_WEBHOOK_URL }}"
+                  )"
+
+                  if [ "$status_code" -lt 200 ] || [ "$status_code" -ge 300 ]; then
+                      echo "Portainer webhook failed with HTTP $status_code"
+                      cat "$response_file"
+                      exit 1
+                  fi
+
+                  echo "Portainer webhook accepted with HTTP $status_code"
