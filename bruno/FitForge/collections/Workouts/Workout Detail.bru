@@ -1,0 +1,49 @@
+meta {
+  name: Workout Detail
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/workouts/{{workoutId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+tests {
+  test("returns 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("exposes session-level fields", function () {
+    expect(res.getBody()).to.include.keys([
+      "id",
+      "startedAt",
+      "durationMin",
+      "generalFeeling",
+      "notes",
+      "routine",
+      "totals",
+      "exercises",
+    ]);
+  });
+
+  test("totals are numeric", function () {
+    const t = res.getBody().totals;
+    expect(t.exerciseCount).to.be.a("number");
+    expect(t.setCount).to.be.a("number");
+    expect(t.repCount).to.be.a("number");
+    expect(t.volumeKg).to.be.a("number");
+  });
+
+  test("exercises include nested sets", function () {
+    res.getBody().exercises.forEach((ex) => {
+      expect(ex).to.include.keys(["id", "orderIndex", "exercise", "sets"]);
+      expect(ex.sets).to.be.an("array");
+    });
+  });
+}

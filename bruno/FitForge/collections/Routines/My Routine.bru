@@ -1,0 +1,34 @@
+meta {
+  name: My Routine
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/users/me/routine
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+tests {
+  test("returns 200 or 404", function () {
+    expect([200, 404]).to.include(res.getStatus());
+  });
+
+  test("when 200, exposes routine detail fields", function () {
+    if (res.getStatus() !== 200) return;
+    expect(res.getBody()).to.include.keys([
+      "id",
+      "name",
+      "description",
+      "difficulty",
+      "goalType",
+      "exercises",
+    ]);
+    expect(res.getBody().exercises).to.be.an("array");
+  });
+}

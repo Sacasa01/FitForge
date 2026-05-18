@@ -52,27 +52,21 @@ class RoutineController extends AbstractController
             return $this->json(['error' => 'Routine not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $exercises = array_map(fn(RoutineExercise $re) => [
-            'id' => $re->getId(),
-            'exercise' => [
-                'id' => $re->getExercise()->getId(),
-                'name' => $re->getExercise()->getName(),
-                'muscleGroup' => $re->getExercise()->getMuscleGroup(),
-                'equipment' => $re->getExercise()->getEquipment(),
-            ],
-            'sets' => $re->getSets(),
-            'reps' => $re->getReps(),
-            'orderIndex' => $re->getOrderIndex(),
-        ], $routine->getRoutineExercises()->toArray());
+        return $this->json($this->serializeRoutine($routine));
+    }
 
-        return $this->json([
-            'id' => $routine->getId(),
-            'name' => $routine->getName(),
-            'description' => $routine->getDescription(),
-            'difficulty' => $routine->getDifficulty()->value,
-            'goalType' => $routine->getGoalType()?->value,
-            'exercises' => $exercises,
-        ]);
+    #[Route('/api/users/me/routine', methods: ['GET'])]
+    public function myRoutine(): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        $routine = $user->getAssignedRoutine();
+        if (!$routine) {
+            return $this->json(['error' => 'No routine assigned'], Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->json($this->serializeRoutine($routine));
     }
 
     #[Route('/api/users/me/assign-routine', methods: ['POST'])]
@@ -98,5 +92,30 @@ class RoutineController extends AbstractController
             'message' => 'Routine assigned successfully',
             'assignedRoutineId' => $routine->getId(),
         ]);
+    }
+
+    private function serializeRoutine(Routine $routine): array
+    {
+        $exercises = array_map(fn(RoutineExercise $re) => [
+            'id' => $re->getId(),
+            'exercise' => [
+                'id' => $re->getExercise()->getId(),
+                'name' => $re->getExercise()->getName(),
+                'muscleGroup' => $re->getExercise()->getMuscleGroup(),
+                'equipment' => $re->getExercise()->getEquipment(),
+            ],
+            'sets' => $re->getSets(),
+            'reps' => $re->getReps(),
+            'orderIndex' => $re->getOrderIndex(),
+        ], $routine->getRoutineExercises()->toArray());
+
+        return [
+            'id' => $routine->getId(),
+            'name' => $routine->getName(),
+            'description' => $routine->getDescription(),
+            'difficulty' => $routine->getDifficulty()->value,
+            'goalType' => $routine->getGoalType()?->value,
+            'exercises' => $exercises,
+        ];
     }
 }

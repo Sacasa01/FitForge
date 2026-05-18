@@ -93,6 +93,77 @@ class WorkoutController extends AbstractController
         ]);
     }
 
+    #[Route('/{id}', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function detail(int $id, EntityManagerInterface $em): JsonResponse
+    {
+        $session = $this->findSessionForCurrentUser($id, $em);
+        if ($session instanceof JsonResponse) {
+            return $session;
+        }
+
+        $totalSets = 0;
+        $totalReps = 0;
+        $totalVolumeKg = 0.0;
+
+        $exercises = [];
+        foreach ($session->getSessionExercises() as $se) {
+            $sets = [];
+            foreach ($se->getExerciseSets() as $set) {
+                $reps = $set->getReps();
+                $weight = $set->getWeightKg();
+                $totalSets++;
+                if ($reps !== null) {
+                    $totalReps += $reps;
+                    if ($weight !== null) {
+                        $totalVolumeKg += $reps * (float) $weight;
+                    }
+                }
+
+                $sets[] = [
+                    'id' => $set->getId(),
+                    'setNumber' => $set->getSetNumber(),
+                    'reps' => $reps,
+                    'weightKg' => $weight,
+                    'rpe' => $set->getRpe(),
+                ];
+            }
+
+            $exercise = $se->getExercise();
+            $exercises[] = [
+                'id' => $se->getId(),
+                'orderIndex' => $se->getOrderIndex(),
+                'enjoyment' => $se->getEnjoyment(),
+                'difficulty' => $se->getDifficulty(),
+                'exercise' => $exercise ? [
+                    'id' => $exercise->getId(),
+                    'name' => $exercise->getName(),
+                    'muscleGroup' => $exercise->getMuscleGroup(),
+                    'equipment' => $exercise->getEquipment(),
+                ] : null,
+                'sets' => $sets,
+            ];
+        }
+
+        return $this->json([
+            'id' => $session->getId(),
+            'startedAt' => $session->getStartedAt()->format('c'),
+            'durationMin' => $session->getDurationMin(),
+            'generalFeeling' => $session->getGeneralFeeling()?->value,
+            'notes' => $session->getNotes(),
+            'routine' => $session->getRoutine() ? [
+                'id' => $session->getRoutine()->getId(),
+                'name' => $session->getRoutine()->getName(),
+            ] : null,
+            'totals' => [
+                'exerciseCount' => count($exercises),
+                'setCount' => $totalSets,
+                'repCount' => $totalReps,
+                'volumeKg' => round($totalVolumeKg, 2),
+            ],
+            'exercises' => $exercises,
+        ]);
+    }
+
     #[Route('/{id}/exercises', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function addExercise(int $id, Request $request, EntityManagerInterface $em): JsonResponse
     {

@@ -1,0 +1,48 @@
+meta {
+  name: List
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/exercises?page=1&limit=50
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 50
+  ~muscleGroup: chest
+  ~equipment: barbell
+  ~search: press
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+tests {
+  test("returns 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("paginates with data array", function () {
+    const body = res.getBody();
+    expect(body).to.include.keys(["data", "page", "limit", "total"]);
+    expect(body.data).to.be.an("array");
+  });
+
+  test("each item exposes catalog fields", function () {
+    res.getBody().data.forEach((item) => {
+      expect(item).to.include.keys([
+        "id",
+        "name",
+        "description",
+        "muscleGroup",
+        "equipment",
+        "caloriesPerMin",
+      ]);
+    });
+  });
+}

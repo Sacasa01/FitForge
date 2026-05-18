@@ -1,0 +1,74 @@
+meta {
+  name: Stats
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/api/users/me/stats?topExercises=10
+  body: none
+  auth: bearer
+}
+
+params:query {
+  topExercises: 10
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+tests {
+  test("returns 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("returns totals, personalRecords, progressByExercise", function () {
+    expect(res.getBody()).to.include.keys([
+      "totals",
+      "personalRecords",
+      "progressByExercise",
+    ]);
+  });
+
+  test("totals has aggregate counters", function () {
+    expect(res.getBody().totals).to.include.keys([
+      "sessionCount",
+      "totalMinutes",
+      "trainingDays",
+      "setCount",
+      "repCount",
+      "volumeKg",
+    ]);
+  });
+
+  test("each personal record exposes exercise + records", function () {
+    res.getBody().personalRecords.forEach((pr) => {
+      expect(pr).to.include.keys([
+        "exercise",
+        "sessionCount",
+        "maxWeightKg",
+        "maxReps",
+        "maxVolumeKgInSingleSet",
+        "lastPerformedAt",
+      ]);
+      expect(pr.exercise).to.include.keys(["id", "name", "muscleGroup", "equipment"]);
+    });
+  });
+
+  test("each progress entry has timeline points", function () {
+    res.getBody().progressByExercise.forEach((p) => {
+      expect(p).to.include.keys(["exercise", "points"]);
+      expect(p.points).to.be.an("array");
+      p.points.forEach((pt) => {
+        expect(pt).to.include.keys([
+          "sessionId",
+          "performedAt",
+          "maxWeightKg",
+          "maxReps",
+          "volumeKg",
+        ]);
+      });
+    });
+  });
+}

@@ -1,0 +1,55 @@
+meta {
+  name: Detail
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/exercises/1?historyLimit=10
+  body: none
+  auth: bearer
+}
+
+params:query {
+  historyLimit: 10
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+tests {
+  test("returns 200", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+
+  test("exposes exercise + personalRecords + history", function () {
+    expect(res.getBody()).to.include.keys([
+      "id",
+      "name",
+      "description",
+      "muscleGroup",
+      "equipment",
+      "caloriesPerMin",
+      "personalRecords",
+      "history",
+    ]);
+  });
+
+  test("personalRecords has the expected shape", function () {
+    expect(res.getBody().personalRecords).to.include.keys([
+      "sessionCount",
+      "maxWeightKg",
+      "maxReps",
+      "maxVolumeKgInSingleSet",
+      "lastPerformedAt",
+    ]);
+  });
+
+  test("history entries have sessionId and sets", function () {
+    res.getBody().history.forEach((h) => {
+      expect(h).to.include.keys(["sessionId", "performedAt", "sets"]);
+      expect(h.sets).to.be.an("array");
+    });
+  });
+}

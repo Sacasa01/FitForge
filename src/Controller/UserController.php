@@ -2,8 +2,11 @@
 
 namespace App\Controller;
 
+use App\Entity\Exercise;
+use App\Entity\ExerciseSet;
 use App\Entity\User;
 use App\Entity\UserWeightLog;
+use App\Entity\WorkoutSession;
 use App\Enum\ActivityLevel;
 use App\Enum\GoalType;
 use App\Service\NutritionCalculator;
@@ -281,6 +284,166 @@ class UserController extends AbstractController
         $em->flush();
 
         return $this->json($profile);
+    }
+
+    #[Route('/me/stats', methods: ['GET'])]
+    public function stats(Request $request, EntityManagerInterface $em): JsonResponse
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        $topExercises = min(50, max(1, (int) $request->query->get('topExercises', 10)));
+
+        $sessionTotals = $em->createQueryBuilder()
+            ->select(
+                'COUNT(ws.id) AS sessionCount',
+                'COALESCE(SUM(ws.durationMin), 0) AS totalMinutes',
+            )
+            ->from(WorkoutSession::class, 'ws')
+            ->where('ws.user = :userId')
+            ->setParameter('userId', $user->getId())
+            ->getQuery()
+            ->getSingleResult();
+
+        $setTotals = $em->createQueryBuilder()
+            ->select(
+                'COUNT(es.id) AS setCount',
+                'COALESCE(SUM(es.reps), 0) AS repCount',
+                'COALESCE(SUM(CASE WHEN es.weightKg IS NOT NULL AND es.reps IS NOT NULL THEN es.weightKg * es.reps ELSE 0 END), 0) AS volumeKg',
+            )
+            ->from(ExerciseSet::class, 'es')
+            ->innerJoin('es.sessionExercise', 'se')
+            ->innerJoin('se.session', 'ws')
+            ->where('ws.user = :userId')
+            ->setParameter('userId', $user->getId())
+            ->getQuery()
+            ->getSingleResult();
+
+        $distinctDays = (int) $em->getConnection()
+            ->executeQuery(
+                'SELECT COUNT(DISTINCT DATE(started_at)) FROM workout_sessions WHERE user_id = :userId',
+                ['userId' => $user->getId()],
+            )
+            ->fetchOne();
+
+        $prRows = $em->createQueryBuilder()
+            ->select(
+                'IDENTITY(se.exercise) AS exerciseId',
+                'COUNT(DISTINCT ws.id) AS sessionCount',
+                'MAX(es.weightKg) AS maxWeightKg',
+                'MAX(es.reps) AS maxReps',
+                'MAX(es.weightKg * es.reps) AS maxVolumeKgInSingleSet',
+                'MAX(ws.startedAt) AS lastPerformedAt',
+            )
+            ->from(ExerciseSet::class, 'es')
+            ->innerJoin('es.sessionExercise', 'se')
+            ->innerJoin('se.session', 'ws')
+            ->where('ws.user = :userId')
+            ->setParameter('userId', $user->getId())
+            ->groupBy('se.exercise')
+            ->getQuery()
+            ->getArrayResult();
+
+        $exerciseIds = array_map(fn(array $r) => (int) $r['exerciseId'], $prRows);
+        $exercisesById = [];
+        if ($exerciseIds) {
+            $exercises = $em->getRepository(Exercise::class)->findBy(['id' => $exerciseIds]);
+            foreach ($exercises as $e) {
+                $exercisesById[$e->getId()] = $e;
+            }
+        }
+
+        $personalRecords = array_map(function (array $r) use ($exercisesById) {
+            $exerciseId = (int) $r['exerciseId'];
+            $e = $exercisesById[$exerciseId] ?? null;
+
+            return [
+                'exercise' => $e ? [
+                    'id' => $e->getId(),
+                    'name' => $e->getName(),
+                    'muscleGroup' => $e->getMuscleGroup(),
+                    'equipment' => $e->getEquipment(),
+                ] : ['id' => $exerciseId, 'name' => null, 'muscleGroup' => null, 'equipment' => null],
+                'sessionCount' => (int) $r['sessionCount'],
+                'maxWeightKg' => $r['maxWeightKg'] !== null ? (float) $r['maxWeightKg'] : null,
+                'maxReps' => $r['maxReps'] !== null ? (int) $r['maxReps'] : null,
+                'maxVolumeKgInSingleSet' => $r['maxVolumeKgInSingleSet'] !== null
+                    ? round((float) $r['maxVolumeKgInSingleSet'], 2)
+                    : null,
+                'lastPerformedAt' => !empty($r['lastPerformedAt'])
+                    ? (new \DateTime($r['lastPerformedAt']))->format('c')
+                    : null,
+            ];
+        }, $prRows);
+
+        usort(
+            $personalRecords,
+            fn($a, $b) => $b['sessionCount'] <=> $a['sessionCount'] ?: ($b['maxWeightKg'] ?? 0) <=> ($a['maxWeightKg'] ?? 0),
+        );
+
+        $topExerciseIds = array_map(fn($r) => $r['exercise']['id'], array_slice($personalRecords, 0, $topExercises));
+
+        $progressByExercise = [];
+        if ($topExerciseIds) {
+            $progressRows = $em->createQueryBuilder()
+                ->select(
+                    'IDENTITY(se.exercise) AS exerciseId',
+                    'ws.id AS sessionId',
+                    'ws.startedAt AS performedAt',
+                    'MAX(es.weightKg) AS maxWeightKg',
+                    'MAX(es.reps) AS maxReps',
+                    'COALESCE(SUM(CASE WHEN es.weightKg IS NOT NULL AND es.reps IS NOT NULL THEN es.weightKg * es.reps ELSE 0 END), 0) AS volumeKg',
+                )
+                ->from(ExerciseSet::class, 'es')
+                ->innerJoin('es.sessionExercise', 'se')
+                ->innerJoin('se.session', 'ws')
+                ->where('ws.user = :userId')
+                ->andWhere('se.exercise IN (:exerciseIds)')
+                ->setParameter('userId', $user->getId())
+                ->setParameter('exerciseIds', $topExerciseIds)
+                ->groupBy('se.exercise, ws.id, ws.startedAt')
+                ->orderBy('ws.startedAt', 'ASC')
+                ->getQuery()
+                ->getArrayResult();
+
+            $groupedPoints = [];
+            foreach ($progressRows as $row) {
+                $exerciseId = (int) $row['exerciseId'];
+                $groupedPoints[$exerciseId][] = [
+                    'sessionId' => (int) $row['sessionId'],
+                    'performedAt' => (new \DateTime($row['performedAt']))->format('c'),
+                    'maxWeightKg' => $row['maxWeightKg'] !== null ? (float) $row['maxWeightKg'] : null,
+                    'maxReps' => $row['maxReps'] !== null ? (int) $row['maxReps'] : null,
+                    'volumeKg' => round((float) $row['volumeKg'], 2),
+                ];
+            }
+
+            foreach ($topExerciseIds as $exerciseId) {
+                $e = $exercisesById[$exerciseId] ?? null;
+                $progressByExercise[] = [
+                    'exercise' => $e ? [
+                        'id' => $e->getId(),
+                        'name' => $e->getName(),
+                        'muscleGroup' => $e->getMuscleGroup(),
+                        'equipment' => $e->getEquipment(),
+                    ] : ['id' => $exerciseId, 'name' => null, 'muscleGroup' => null, 'equipment' => null],
+                    'points' => $groupedPoints[$exerciseId] ?? [],
+                ];
+            }
+        }
+
+        return $this->json([
+            'totals' => [
+                'sessionCount' => (int) $sessionTotals['sessionCount'],
+                'totalMinutes' => (int) $sessionTotals['totalMinutes'],
+                'trainingDays' => $distinctDays,
+                'setCount' => (int) $setTotals['setCount'],
+                'repCount' => (int) $setTotals['repCount'],
+                'volumeKg' => round((float) $setTotals['volumeKg'], 2),
+            ],
+            'personalRecords' => $personalRecords,
+            'progressByExercise' => $progressByExercise,
+        ]);
     }
 
     private function serializeUser(User $user): array
