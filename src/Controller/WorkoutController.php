@@ -5,9 +5,12 @@ namespace App\Controller;
 use App\Entity\Exercise;
 use App\Entity\ExerciseSet;
 use App\Entity\Routine;
+use App\Entity\RoutineExercise;
 use App\Entity\SessionExercise;
 use App\Entity\User;
+use App\Entity\UserRoutineSchedule;
 use App\Entity\WorkoutSession;
+use App\Enum\DayOfWeek;
 use App\Enum\GeneralFeeling;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -26,20 +29,30 @@ class WorkoutController extends AbstractController
         $user = $this->getUser();
         $data = json_decode($request->getContent(), true) ?? [];
 
-        $session = new WorkoutSession();
-        $session->setUser($user);
-        $session->setStartedAt(
-            isset($data['startedAt']) ? new \DateTime($data['startedAt']) : new \DateTime(),
-        );
+        $startedAt = isset($data['startedAt']) ? new \DateTime($data['startedAt']) : new \DateTime();
 
+        $routine = null;
         if (!empty($data['routineId'])) {
             $routine = $em->getRepository(Routine::class)->find((int) $data['routineId']);
             if (!$routine) {
                 return $this->json(['error' => 'Routine not found'], Response::HTTP_NOT_FOUND);
             }
-            $session->setRoutine($routine);
+        } else {
+            $today = DayOfWeek::fromPhpDayOfWeek((int) $startedAt->format('w'));
+            $entry = $em->getRepository(UserRoutineSchedule::class)
+                ->findOneBy(['user' => $user, 'dayOfWeek' => $today]);
+            if ($entry) {
+                $routine = $entry->getRoutine();
+            }
         }
 
+        $session = new WorkoutSession();
+        $session->setUser($user);
+        $session->setStartedAt($startedAt);
+        if ($routine) {
+            $session->setRoutine($routine);
+            $this->populateFromRoutine($session, $routine);
+        }
         if (isset($data['notes'])) {
             $session->setNotes($data['notes']);
         }
@@ -52,7 +65,20 @@ class WorkoutController extends AbstractController
             'startedAt' => $session->getStartedAt()->format('c'),
             'routineId' => $session->getRoutine()?->getId(),
             'notes' => $session->getNotes(),
+            'exerciseCount' => $session->getSessionExercises()->count(),
         ], Response::HTTP_CREATED);
+    }
+
+    private function populateFromRoutine(WorkoutSession $session, Routine $routine): void
+    {
+        foreach ($routine->getRoutineExercises() as $re) {
+            /** @var RoutineExercise $re */
+            $sessionExercise = new SessionExercise();
+            $sessionExercise->setSession($session);
+            $sessionExercise->setExercise($re->getExercise());
+            $sessionExercise->setOrderIndex($re->getOrderIndex());
+            $session->addSessionExercise($sessionExercise);
+        }
     }
 
     #[Route('', methods: ['GET'])]

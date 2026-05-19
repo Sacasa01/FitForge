@@ -1,0 +1,15 @@
+meta {
+  name: Clear Day
+  type: http
+  seq: 4
+}
+
+delete {
+  url: {{baseUrl}}/api/users/me/schedule/monday
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}

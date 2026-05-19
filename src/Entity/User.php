@@ -105,12 +105,23 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(targetEntity: DietLog::class, mappedBy: 'user', cascade: ['persist', 'remove'])]
     private Collection $dietLogs;
 
+    /** @var Collection<int, UserRoutineSchedule> */
+    #[ORM\OneToMany(targetEntity: UserRoutineSchedule::class, mappedBy: 'user', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    private Collection $routineSchedules;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
         $this->weightLogs = new ArrayCollection();
         $this->workoutSessions = new ArrayCollection();
         $this->dietLogs = new ArrayCollection();
+        $this->routineSchedules = new ArrayCollection();
+    }
+
+    /** @return Collection<int, UserRoutineSchedule> */
+    public function getRoutineSchedules(): Collection
+    {
+        return $this->routineSchedules;
     }
 
     public function getId(): ?int

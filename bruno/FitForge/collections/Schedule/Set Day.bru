@@ -1,0 +1,21 @@
+meta {
+  name: Set Day
+  type: http
+  seq: 3
+}
+
+put {
+  url: {{baseUrl}}/api/users/me/schedule/monday
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{token}}
+}
+
+body:json {
+  {
+    "routineId": 2
+  }
+}
